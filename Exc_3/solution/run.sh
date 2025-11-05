@@ -1,5 +1,4 @@
 #!/bin/sh
-set -e
 
 docker stop orderservice postgres18 2>/dev/null || true
 docker rm orderservice postgres18 2>/dev/null || true
@@ -26,7 +25,6 @@ echo "run db"
 # docker run orderservice
 sleep 10
 
-#  -p 8080:8080 \
 docker run -d \
   --name orderservice \
   --env-file ./debug.env \
