@@ -8,16 +8,16 @@ services:
     env_file:
       - ./debug.env
     networks:
-      - orderapp-network
+      - orderapp-network 
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/18/docker
+      - pgdata:/var/lib/postgresql/18/docker #store DB data persistently here/mount volume into container here 
 
   #OrderService container 
   orderservice:
     build:
-      context: .
+      context: . 
       dockerfile: Dockerfile
     container_name: orderservice
     restart: unless-stopped
@@ -29,13 +29,13 @@ services:
       - "3000:3000"
     depends_on:
       - postgres18
-    command: ["./ordersystem"]  # start your app binary on container run
+    command: ["./ordersystem"]  # start your app binary on container run - could remove from docker compose since it is already in Dockerfile
 
 #Shared network 
 networks:
   orderapp-network:
-    driver: bridge
+    driver: bridge #bridge network to allow inter-container communication by name 
 
 #Persistent volume for Postgres 
 volumes:
-  pgdata:
+  pgdata: # name a volume to then store PostgreSQL data outside the container for persistence

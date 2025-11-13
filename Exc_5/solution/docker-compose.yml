@@ -1,0 +1,97 @@
+networks:
+  web:
+    name: web
+  intercom:
+    name: intercom
+
+volumes:
+  order_pg_vol:
+
+services:
+  traefik:
+    image: "traefik:v3.5.2"
+    # todo add traefik config
+    # todo only expose network web
+    # -----
+    container_name: traefik
+    command:
+      - "--api.insecure=true" # Enable Traefik dashboard, to see active routers and services
+
+      - "--providers.docker=true" # Enable Docker provider
+
+      - "--providers.docker.exposedbydefault=false" # Don’t expose all containers automatically only the ones with "traefik.enable=true" label
+
+      - "--providers.docker.network=web" # Specify the Docker network to use
+
+      - "--entrypoints.web.address=:80" # Define web entrypoint
+    ports:
+      - "80:80"       # Main HTTP entrypoint
+      - "8080:8080"   # Dashboard 
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # -----
+    networks:
+      - web
+
+
+  orderservice:
+    container_name: orderservice
+    build: .
+    command: [ "/app/ordersystem" ]
+    # todo add traefik labels
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=order
+      - POSTGRES_USER=docker
+      - POSTGRES_PASSWORD=docker
+      - POSTGRES_TCP_PORT=5432
+      - DB_HOST=order-postgres
+    networks:
+      - intercom
+      - web
+    # -----
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.orderservice.rule=Host(`orders.localhost`)" # if order.localhost is accessed send request to this container
+      - "traefik.http.routers.orderservice.entrypoints=web" # define entrypoint - above we defined web on port 80, so requests to port 80 will be routed here
+      - "traefik.http.services.orderservice.loadbalancer.server.port=3000" # tell traefik which port inside the container to route to
+    # -----
+
+  sws:
+    image: joseluisq/static-web-server:latest
+    # todo add frontend folder as volume
+    # todo setup environment variables to expose port 80 and serve the frontend folder
+    # -----
+    container_name: sws
+    environment:
+      - SERVER_ROOT=/public       # Folder to serve
+      - SERVER_PORT=80            # Internal port
+
+    volumes:
+      - ./frontend:/public     # Mount frontend folder
+    # -----
+    networks:
+      - web
+    # todo add traefik labels
+    # -----
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sws.rule=Host(`localhost`)" # if localhost is accessed send request to this container
+      - "traefik.http.routers.sws.entrypoints=web" # define entrypoint - above we defined web on port 80, so requests to port 80 will be routed here
+      - "traefik.http.services.sws.loadbalancer.server.port=80" # tell traefik which port inside the container to route to
+    # -----
+
+  order-postgres:
+    image: postgres:latest
+    restart: always
+    networks:
+      - intercom
+    volumes:
+      - order_pg_vol:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=order
+      - POSTGRES_USER=docker
+      - POSTGRES_PASSWORD=docker
+      - POSTGRES_TCP_PORT=5432
